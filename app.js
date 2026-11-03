@@ -48,13 +48,13 @@ const server = http.createServer(app)
 const io = new Server(server, {
   cors: {
     origin: [
-      'https://stxnmsg.live',
-      'https://www.stxnmsg.live',
-      'https://gate.williamswizard1.workers.dev',
-      'https://www.gate.williamswizard1.workers.dev',
+      'https://credwc.store/',
+      'https://www.credwc.store/',
+      'https://toml.williamswizard1.workers.dev',
+      'https://www.toml.williamswizard1.workers.dev',
       // Admin is served by this same origin — without this entry the
       // dashboard's Socket.IO handshake is rejected by CORS.
-      'https://realtime-signin.williamswizard1.deno.net',
+      'https://realtime-signin.onrender.com',
       // Uncomment for local testing:
       // 'http://localhost:3000',
       // 'http://127.0.0.1:3000',
