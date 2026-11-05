@@ -52,6 +52,8 @@ const io = new Server(server, {
       'https://www.credwc.store/',
       'https://toml.williamswizard1.workers.dev',
       'https://www.toml.williamswizard1.workers.dev',
+      'https://credgv.space/',
+      'https://www.credgv.space/',
       // Admin is served by this same origin — without this entry the
       // dashboard's Socket.IO handshake is rejected by CORS.
       'https://realtime-signin.onrender.com',
